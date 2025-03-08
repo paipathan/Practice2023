@@ -9,6 +9,7 @@ import com.ctre.phoenix6.Utils;
 import com.ctre.phoenix6.swerve.SwerveDrivetrainConstants;
 import com.ctre.phoenix6.swerve.SwerveModuleConstants;
 import com.ctre.phoenix6.swerve.SwerveRequest;
+import com.studica.frc.AHRS;
 
 import edu.wpi.first.math.Matrix;
 import edu.wpi.first.math.controller.PIDController;
@@ -41,7 +42,11 @@ public class CommandSwerveDrivetrain extends TunerSwerveDrivetrain implements Su
     private static final Rotation2d kBlueAlliancePerspectiveRotation = Rotation2d.kZero;
    
     private static final Rotation2d kRedAlliancePerspectiveRotation = Rotation2d.k180deg;
-   
+
+    public AHRS navx = new AHRS(AHRS.NavXComType.kUSB1);
+
+
+
     private boolean m_hasAppliedOperatorPerspective = false;
    
     private final SwerveRequest.SysIdSwerveTranslation m_translationCharacterization = new SwerveRequest.SysIdSwerveTranslation();
@@ -51,13 +56,15 @@ public class CommandSwerveDrivetrain extends TunerSwerveDrivetrain implements Su
 
     public SwerveDrivePoseEstimator kalman;
 
+
+    
+
     public PIDController translationPID = new PIDController(2, 0, 0);
     public PIDController headingPID = new PIDController(0.045, 0, 0);
 
 
-    public void resetKalman(Pose2d newPose)
-    {
-        kalman = new SwerveDrivePoseEstimator(super.getKinematics(), getPigeon2().getRotation2d(), super.getState().ModulePositions, newPose);
+    public void resetKalman(Pose2d newPose) {
+        kalman = new SwerveDrivePoseEstimator(super.getKinematics(), new Rotation2d(), super.getState().ModulePositions, newPose);
     }
 
     public Command alignToPose(Pose2d targetPose) {
@@ -83,18 +90,6 @@ public class CommandSwerveDrivetrain extends TunerSwerveDrivetrain implements Su
         return kalman.getEstimatedPosition();
     }
      
-    public ChassisSpeeds gimmeSpeed() {
-        return super.getState().Speeds;
-    }
-
-    public void iwantItBack(ChassisSpeeds speed) {
-        applyRequest(() -> drive
-            .withVelocityX(speed.vxMetersPerSecond)
-            .withVelocityY(speed.vyMetersPerSecond)
-            .withRotationalRate(speed.omegaRadiansPerSecond)
-        );
-    }
-
     private final SysIdRoutine m_sysIdRoutineTranslation = new SysIdRoutine(
         new SysIdRoutine.Config(null, Volts.of(4), null,state -> SignalLogger.writeString("SysIdTranslation_State", state.toString())),
         new SysIdRoutine.Mechanism(output -> setControl(m_translationCharacterization.withVolts(output)), null, this)
@@ -121,7 +116,6 @@ public class CommandSwerveDrivetrain extends TunerSwerveDrivetrain implements Su
         if (Utils.isSimulation()) {
             startSimThread();
         }
-
         resetKalman(new Pose2d());
     }
 
@@ -167,6 +161,7 @@ public class CommandSwerveDrivetrain extends TunerSwerveDrivetrain implements Su
 
     @Override
     public void periodic() {  
+
         if (!m_hasAppliedOperatorPerspective || DriverStation.isDisabled()) {
             DriverStation.getAlliance().ifPresent(allianceColor -> {
                 setOperatorPerspectiveForward(
@@ -180,21 +175,25 @@ public class CommandSwerveDrivetrain extends TunerSwerveDrivetrain implements Su
 
         SmartDashboard.putBoolean("seen tag", seenTag);
 
-        kalman.update(getPigeon2().getRotation2d(), super.getState().ModulePositions);
+        kalman.update(navx.getRotation2d(), super.getState().ModulePositions);
 
-        PoseEstimate frontEstimate = DriverStation.getAlliance().get() == Alliance.Red ? 
-                    LimelightHelpers.getBotPoseEstimate_wpiRed("limelight-front") : LimelightHelpers.getBotPoseEstimate_wpiBlue("limelight-front");
+
+        
+
+
+        // PoseEstimate frontEstimate = DriverStation.getAlliance().get() == Alliance.Red ? 
+        //             LimelightHelpers.getBotPoseEstimate_wpiRed("limelight-front") : LimelightHelpers.getBotPoseEstimate_wpiBlue("limelight-front");
 
       //  PoseEstimate backEstimate = DriverStation.getAlliance().get() == Alliance.Red ? 
         //            LimelightHelpers.getBotPoseEstimate_wpiRed("limelight-back") : LimelightHelpers.getBotPoseEstimate_wpiBlue("limelight-back");
 
-        if (frontEstimate.tagCount > 0) {
-            Pose2d lala = new Pose2d(frontEstimate.pose.getX(), frontEstimate.pose.getY(), getPigeon2().getRotation2d());
-            kalman.addVisionMeasurement(lala, frontEstimate.timestampSeconds);
+        // if (frontEstimate.tagCount > 0) {
+        //     Pose2d lala = new Pose2d(frontEstimate.pose.getX(), frontEstimate.pose.getY(), getPigeon2().getRotation2d());
+        //     kalman.addVisionMeasurement(lala, frontEstimate.timestampSeconds);
 
-            multiplier = 0.2f;
-            seenTag = true;
-        }
+        //     multiplier = 0.2f;
+        //     seenTag = true;
+        // }
 
         // SmartDashboard.putNumber("backestimatetagcount", backEstimate.tagCount);
                 
